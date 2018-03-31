@@ -14,13 +14,17 @@
  * YOU ARE FREE TO CHANGE THIS FILE BELOW THIS POINT AS YOU SEE FIT
  *
  */
-static struct barorder* order_queue[NCUSTOMERS];
-
-int head, tail;
+static struct barorder order_queue[NCUSTOMERS];
+static struct barorder filled_queue[NCUSTOMERS];
+int head, tail, filled_count, filled_head, filled_tail, orderid;
 static struct semaphore *order_queue_empty;
 static struct semaphore *order_queue_full;
+static struct cv *filled_queue_empty;
+static struct cv *filled_queue_full;
 static struct semaphore *queue_mutex;
 static struct lock *bottle_lock;
+static struct lock *filled_lock;
+
 /* Declare any globals you need here (e.g. locks, etc...) */
 
 
@@ -42,15 +46,23 @@ void order_drink(struct barorder *order)
 {
         P(order_queue_empty);
 	P(queue_mutex);
-	tail = (tail+1) % NCUSTOMERS;
-	order_queue[tail] = order;
-	order->wait = sem_create("order_wait", 0);
+	order->id = orderid++;
+	tail = (tail+1) % NCUSTOMERS;	
+	order_queue[tail] = *order;
 	V(queue_mutex);	
 	V(order_queue_full);
-	if(order->go_home_flag != 1){
-                P(order->wait);
-	}
-	sem_destroy(order->wait);
+	struct barorder* ret;
+	lock_acquire(filled_lock);
+	do{
+		while(filled_count == 0){
+			cv_wait(filled_queue_empty, filled_lock);		
+		}
+		ret = &filled_queue[filled_head];
+	}while(ret->id == order->id);	
+	filled_count--;
+	filled_head = (filled_head+1) % NCUSTOMERS;	
+	cv_signal(filled_queue_full, filled_lock);
+	lock_release(filled_lock);
 }
 
 
@@ -71,9 +83,9 @@ void order_drink(struct barorder *order)
 
 struct barorder *take_order(void)
 {
-        P(order_queue_full);
+	P(order_queue_full);
 	P(queue_mutex);
-	struct barorder *ret = order_queue[head];
+	struct barorder *ret = &order_queue[head];
 	head = (head+1) % NCUSTOMERS;
 	V(queue_mutex);
 	V(order_queue_empty);
@@ -113,10 +125,15 @@ void fill_order(struct barorder *order)
 
 void serve_order(struct barorder *order)
 {	
-  if(order->go_home_flag == 1){
-    return;
-  }
-  V(order->wait);
+	lock_acquire(filled_lock);
+	while(filled_count == NCUSTOMERS){
+		cv_wait(filled_queue_full, filled_lock);
+	}
+	filled_tail = (filled_tail+1) % NCUSTOMERS;	
+	filled_queue[filled_tail] = *order;
+	filled_count++;
+	cv_signal(filled_queue_empty, filled_lock);
+	lock_release(filled_lock);
 }
 
 
@@ -138,7 +155,10 @@ void serve_order(struct barorder *order)
 
 void bar_open(void)
 {
-	head = 0; tail = -1;
+	head = 0; tail = 0;
+	filled_count = 0;
+	filled_head = 0; filled_tail = 0;
+	orderid = 1;
 	// create and Initialize semaphores
 	order_queue_full = sem_create("order_queue_full", 0);
 	KASSERT(order_queue_full != 0); // panics when the order_queue_full is not initialized.
@@ -149,11 +169,21 @@ void bar_open(void)
 	queue_mutex = sem_create("queue_mutex", 1);
 	KASSERT(queue_mutex != 0); // panics when the queue_mutex is not initialized.
 
+	filled_queue_full = cv_create("filled_queue_full");
+	KASSERT(filled_queue_full != 0); // panics when the filled_queue_full is not initialized.
+
+	filled_queue_empty = cv_create("filled_queue_empty");
+	KASSERT(filled_queue_empty != 0); // panics when the filled_queue_empty is not initialized.	
+
 	//create locks
 	bottle_lock = lock_create("bottle lock");
         if (bottle_lock == NULL) {
                 panic("no memory");
-        }        
+        }
+	filled_lock = lock_create("filled lock");
+        if (filled_lock == NULL) {
+                panic("no memory");
+        }
 }
 
 /*
@@ -165,9 +195,11 @@ void bar_open(void)
 
 void bar_close(void)
 {
-        sem_destroy(order_queue_full);
+	sem_destroy(order_queue_full);
 	sem_destroy(order_queue_empty);
 	sem_destroy(queue_mutex);
+	cv_destroy(filled_queue_full);
+	cv_destroy(filled_queue_empty);
 	lock_destroy(bottle_lock);
 }
 

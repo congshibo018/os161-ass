@@ -15,7 +15,7 @@
  *
  */
 
-//#define PRINT_ON
+/*#define PRINT_ON*/
 /* this semaphore is for cleaning up at the end. */
 static struct semaphore *alldone;
 
@@ -82,6 +82,7 @@ static void customer(void *unusedpointer, unsigned long customernum)
                 order_drink(&order);
 
 #ifdef PRINT_ON
+		
                 kprintf("C %ld drinking %d, %d, %d\n",
                                 customernum,
                                 order.glass.contents[0],
@@ -137,7 +138,6 @@ static void bartender(void *unusedpointer, unsigned long staff)
 
         i = 0; /* count orders filled for stats */
         while (1) {
-
 #ifdef PRINT_ON
                 kprintf("S %ld taking order\n", staff);
 #endif
@@ -159,7 +159,6 @@ static void bartender(void *unusedpointer, unsigned long staff)
 #endif
 
                         serve_order(order);
-
                 } else {
                         /* Immediately return the order without filling, and then go home */
                         serve_order(order);

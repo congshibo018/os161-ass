@@ -20,6 +20,9 @@ int head, tail;
 static struct semaphore *order_queue_empty;
 static struct semaphore *order_queue_full;
 static struct semaphore *queue_mutex;
+
+static struct semaphore *customer_wait[NCUSTOMERS];
+
 static struct lock *bottle_lock;
 /* Declare any globals you need here (e.g. locks, etc...) */
 
@@ -43,14 +46,13 @@ void order_drink(struct barorder *order)
         P(order_queue_empty);
 	P(queue_mutex);
 	tail = (tail+1) % NCUSTOMERS;
+        order->id = tail;	
 	order_queue[tail] = order;
-	order->wait = sem_create("order_wait", 0);
 	V(queue_mutex);	
 	V(order_queue_full);
 	if(order->go_home_flag != 1){
-                P(order->wait);
+                P(customer_wait[order->id]);
 	}
-	sem_destroy(order->wait);
 }
 
 
@@ -116,7 +118,7 @@ void serve_order(struct barorder *order)
   if(order->go_home_flag == 1){
     return;
   }
-  V(order->wait);
+  V(customer_wait[order->id]);
 }
 
 
@@ -139,6 +141,7 @@ void serve_order(struct barorder *order)
 void bar_open(void)
 {
 	head = 0; tail = -1;
+	int i;
 	// create and Initialize semaphores
 	order_queue_full = sem_create("order_queue_full", 0);
 	KASSERT(order_queue_full != 0); // panics when the order_queue_full is not initialized.
@@ -149,6 +152,11 @@ void bar_open(void)
 	queue_mutex = sem_create("queue_mutex", 1);
 	KASSERT(queue_mutex != 0); // panics when the queue_mutex is not initialized.
 
+        for (i = 0; i< NCUSTOMERS; i++){
+	  char customer_id[80];
+	  snprintf(customer_id,NCUSTOMERS,"customer_id_%d",i);
+	  customer_wait[i] = sem_create(customer_id,0);
+	}
 	//create locks
 	bottle_lock = lock_create("bottle lock");
         if (bottle_lock == NULL) {
@@ -165,9 +173,13 @@ void bar_open(void)
 
 void bar_close(void)
 {
+        int i;
         sem_destroy(order_queue_full);
 	sem_destroy(order_queue_empty);
 	sem_destroy(queue_mutex);
+	for (i = 0; i < NCUSTOMERS; i++){
+	  sem_destroy(customer_wait[i]);
+	}
 	lock_destroy(bottle_lock);
 }
 

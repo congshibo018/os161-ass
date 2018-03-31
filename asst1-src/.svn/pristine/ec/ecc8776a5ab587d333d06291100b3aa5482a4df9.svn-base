@@ -15,7 +15,7 @@
  *
  */
 
-//#define PRINT_ON
+#define PRINT_ON
 /* this semaphore is for cleaning up at the end. */
 static struct semaphore *alldone;
 
@@ -76,7 +76,10 @@ static void customer(void *unusedpointer, unsigned long customernum)
                 }
 
                 /* I'll have a beer. */
-                order.requested_bottles[0] = BEER;
+                order.requested_bottles[0] = VODKA;
+		if(i%2 == 0){
+			order.requested_bottles[1] = BEER;
+		}
 
                 /* order the drink, this blocks until the order is fulfilled */
                 order_drink(&order);
@@ -159,7 +162,6 @@ static void bartender(void *unusedpointer, unsigned long staff)
 #endif
 
                         serve_order(order);
-
                 } else {
                         /* Immediately return the order without filling, and then go home */
                         serve_order(order);
@@ -292,7 +294,6 @@ void mix(struct barorder *order)
          * add drinks to the glass in order given and increment number of
          * doses from particular bottle
          */
-
         for (i = 0; i < DRINK_COMPLEXITY; i++){
                 int bottle;
                 bottle = order->requested_bottles[i];
