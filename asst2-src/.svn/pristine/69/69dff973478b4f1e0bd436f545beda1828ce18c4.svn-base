@@ -1,0 +1,45 @@
+#include <types.h>
+#include <kern/errno.h>
+#include <kern/fcntl.h>
+#include <kern/limits.h>
+#include <kern/stat.h>
+#include <kern/seek.h>
+#include <lib.h>
+#include <uio.h>
+#include <thread.h>
+#include <current.h>
+#include <synch.h>
+#include <vfs.h>
+#include <vnode.h>
+#include <file.h>
+#include <syscall.h>
+#include <copyinout.h>
+
+/*
+ * Add your file-related functions here ...
+ */
+
+int open(const char *filename,int flags){
+  /* *vn = current opening file*/
+  struct file *file;
+  struct vnode *vn;
+  int i;
+  file = kmalloc(sizeof(struct file));
+  if(file == NULL){
+    return ENOMEM;
+  }
+  int error_code = vfs_open(filename, flag, &vn)
+  if(error_code){
+    return error_code
+  }
+  file->f_vnode = vn;
+
+  /*however where to define OFtable still not decided yet so we just implement FDtable first*/
+  for (i = 3; i <= OPEN_MAX; i++){
+    if(curthread->FDtable[i] == NULL){
+      curthread->FDtable[i] = file;
+      return i;
+    }
+  }
+  return EMFILE;
+}

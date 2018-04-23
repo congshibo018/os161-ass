@@ -1,0 +1,43 @@
+#include <types.h>
+#include <kern/errno.h>
+#include <kern/fcntl.h>
+#include <kern/limits.h>
+#include <kern/stat.h>
+#include <kern/seek.h>
+#include <lib.h>
+#include <uio.h>
+#include <thread.h>
+#include <current.h>
+#include <synch.h>
+#include <vfs.h>
+#include <vnode.h>
+#include <file.h>
+#include <syscall.h>
+#include <copyinout.h>
+
+/*
+ * Add your file-related functions here ...
+ */
+
+int open(const char *filename,int flags, int mode, int *fd){
+  /* *vn = current opening file*/
+  struct file *file;
+  struct vnode *vn;
+  
+  file = kmalloc(sizeof(struct file));
+  if(file == NULL){
+    return ENOMEM;
+  }
+  int error_code = vfs_open(filename, flag, mode, &vn)
+  if(error_code){
+    return error_code
+  }
+  file->f_vnode = vn;
+  file->f_lock = lock_create("file_lock");
+  if(file->f_lock == NULL){
+    kfree(file);
+    return ENOMEM;
+  }
+  /*some function to put file in table*/
+  return 0 ;
+}

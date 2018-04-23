@@ -1,0 +1,5 @@
+
+--This line, and those below, will be ignored--
+
+M    kern/include/file.h
+M    kern/syscall/file.c

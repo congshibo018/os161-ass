@@ -12,18 +12,16 @@
 
 struct file {
   struct vnode *f_vnode;
+  struct lock *f_lock;
 };
 
-struct OFtable_node{
-  struct file *file_node;
-  int offset;
+struct file_table{
+  struct file *files[OPEN_MAX];
 };
-
-struct OFtable_node *FDtable[__OPEN_MAX];
 /*
  * Put your function declarations and data types here ...
  */
 
-int open(const char *filename,int flag);
-int close(int fd);
+int open(const char *filename,int flag, int mode, int *ret_value);
+
 #endif /* _FILE_H_ */
