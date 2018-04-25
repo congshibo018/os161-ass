@@ -69,8 +69,7 @@ struct proc {
 
 	/* VFS */
 	struct vnode *p_cwd;		/* current working directory */
-        
-	struct OFtable_node *FDtable[__OPEN_MAX];
+        struct OFtable_node *FDtable[OPEN_MAX];
 
 	/* add more material here as needed */
 };
