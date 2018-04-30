@@ -49,15 +49,15 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <file.h>
-
+#include <vfs.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
-
 /*
  * Create a proc structure.
  */
+extern struct OFtable_node *OFtable;
 static
 struct proc *
 proc_create(const char *name)
@@ -82,11 +82,61 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
-
+	
 	int i;
 	for(i=0;i<__OPEN_MAX; i++){
-		proc->FDtable[i] = (struct OFtable_node*)kmalloc(sizeof(struct OFtable_node*));
+	  proc->FDtable[i] = (struct OFtable_node*)kmalloc(sizeof(struct OFtable_node));
+	  proc->FDtable[i] = NULL;
 	}
+
+	/*link fd0 (closed,ref_count = 1)*/
+	int j=0;
+	int max_j = 32;
+	for(j=0;j<max_j;j++){
+	  if(&OFtable[j] == NULL){
+	    break;
+	  }
+	}
+	if(j==max_j){
+	  return NULL;
+	}
+	OFtable[j].ref_count = 1;
+	proc->FDtable[0] = &OFtable[j];
+
+	/*link fd1*/
+	struct file *file = (struct file*)kmalloc(sizeof(struct file));
+	struct vnode *vn;
+	char c1[] = "con:";
+	for(j=0;j<max_j;j++){
+	  if(&OFtable[j] == NULL){
+	    break;
+	  }
+	}
+	if(j==max_j){
+	  return NULL;
+	}
+	int errno = vfs_open(c1,0,0,&vn);
+	if(errno){
+	  return NULL;
+	}
+	file->f_vnode = vn;
+	OFtable[j].file_node = file;
+	OFtable[j].ref_count = 1;
+	proc->FDtable[1] = &OFtable[j];
+
+	/*link fd2*/
+	for(j=0;j<max_j;j++){
+	  if(&OFtable[j] == NULL){
+	    break;
+	  }
+	}
+	if(j==max_j){
+	  return NULL;
+	}
+	OFtable[j].file_node = file;
+	OFtable[j].ref_count = 1;
+	proc->FDtable[2] = &OFtable[j];
+
 	return proc;
 }
 

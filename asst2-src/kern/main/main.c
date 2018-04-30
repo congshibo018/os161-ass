@@ -50,7 +50,7 @@
 #include <test.h>
 #include <version.h>
 #include "autoconf.h"  // for pseudoconfig
-
+#include <file.h>
 
 /*
  * These two pieces of data are maintained by the makefiles and build system.
@@ -70,11 +70,11 @@ extern const char buildconfig[];
 static const char harvard_copyright[] =
     "Copyright (c) 2000, 2001-2005, 2008-2011, 2013, 2014\n"
     "   President and Fellows of Harvard College.  All rights reserved.\n";
-
-
+/*int OFtable_Length = (__PID_MAX - __PID_MIN)*__OPEN_MAX;*/
 /*
  * Initial boot sequence.
  */
+struct OFtable_node *OFtable;
 static
 void
 boot(void)
@@ -108,6 +108,9 @@ boot(void)
 
 	/* Early initialization. */
 	ram_bootstrap();
+	/*init OFtable
+	OFtable_bootstrap(); */
+
 	proc_bootstrap();
 	thread_bootstrap();
 	hardclock_bootstrap();
@@ -156,7 +159,8 @@ shutdown(void)
 	vfs_unmountall();
 
 	thread_shutdown();
-
+	/*free OFtable memory
+	OFtable_clear();*/
 	splhigh();
 }
 
@@ -215,3 +219,4 @@ kmain(char *arguments)
 
 	/* Should not get here */
 }
+

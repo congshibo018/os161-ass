@@ -7,6 +7,7 @@
 #include <lib.h>
 #include <uio.h>
 #include <thread.h>
+#include <proc.h>
 #include <current.h>
 #include <synch.h>
 #include <vfs.h>
@@ -19,7 +20,7 @@
  * Add your file-related functions here ...
  */
 
-// changed the argument from const char to char*.
+extern struct OFtable_node *OFtable;
 int open(char *filename,int flags, mode_t mode){
   /* *vn = current opening file*/
   struct file *file;
@@ -40,38 +41,38 @@ int open(char *filename,int flags, mode_t mode){
   file->f_vnode = vn;
 
   /*however where to define OFtable still not decided yet so we just implement FDtable first*/
-  for (i = 3; i <= __OPEN_MAX; i++){
+  for (i = 3; i < __OPEN_MAX; i++){
     if(curproc->FDtable[i] == NULL){
       break;/*i is the index in FDtable*/
     }
   }
-  if(i > __OPEN_MAX){
+  if(i > __OPEN_MAX - 1){
     errno = EMFILE;
     return -1;
   }
 
-  int max_j = (__PID_MAX - __PID_MIN)*__OPEN_MAX;
-  for (j = 0; j <= max_j; j++){
-    if(OFtable[j] == NULL){
+  int max_j = 32;
+  for (j = 0; j < max_j; j++){
+    if(&OFtable[j] == NULL){
       break;/*j is the index in OFtable*/
     }
   }
-  if(j > max_j){
+  if(j > max_j - 1){
     errno = ENFILE;
     return errno;
   }
-  OFtable[j]->file_node = file;/*OFtable not defined yet */
-  OFtable[j]->offset = 0;
-  OFtable[j]->ref_count = 1;
-  OFtable[j]->mode = openflags & O_ACCMODE;
+  OFtable[j].file_node = file;
+  OFtable[j].offset = 0;
+  OFtable[j].ref_count = 1;
+  OFtable[j].mode = flags & O_ACCMODE;
 
-  curproc->FDtable[i] = OFtable[j];
+  curproc->FDtable[i] = &OFtable[j];
   return 0;
 }
 
 int close(int fd){
-  int i;
-  if(fd<3|| fd>=OPEN_MAX|| curthread->FDtable[fd] == NULL){
+  int errno;
+  if(fd<3|| fd>=OPEN_MAX|| curproc->FDtable[fd] == NULL){
     errno = EBADF;
     return errno;
   }
@@ -81,36 +82,16 @@ int close(int fd){
     kfree(curproc->FDtable[fd]->file_node);
     /*clean OFtable */
     curproc->FDtable[fd]->file_node = NULL;
-    curproc->FDtable[fd]->offset = NULL;
+    curproc->FDtable[fd]->offset = 0;
   }
-
-    int i;int errno;
-    if(fd<3|| fd>=__OPEN_MAX|| curproc->FDtable[fd] == NULL){
-        errno = EBADF;
-        return errno;
-    }
-    vfs_close(curproc->FDtable[fd]->file_node->f_vnode);
-    if(curproc->FDtable[fd]->refcount == 1){
-        curproc->FDtable[fd] = NULL;
-        kfree(curproc->FDtable[fd]->file_node);
-        /*clean OFtable */
-        curproc->FDtable[fd]->file_node = NULL;
-        curproc->FDtable[fd]->offset = NULL;
-        /*clean FDtable */
-        curproc->FDtable[fd] = NULL;
-    }
-    else{
-        curproc->FDtable[fd]->refcount--;
-        curproc->FDtable[fd] = NULL;
-    }
-
-    return 0;
-    /*operation on OFtable needed*/
+  curproc->FDtable[fd] = NULL;
+  return 0;
 }
 
 off_t lseek(int fd, off_t pos, int whence){
-  struct stat fileEnd;
+  struct stat *fileStat = NULL;
   off_t new_pos;
+  int errno;
   new_pos = curproc->FDtable[fd]->offset;
 
   if(curproc->FDtable[fd] == NULL){
@@ -122,8 +103,8 @@ off_t lseek(int fd, off_t pos, int whence){
   }else if (whence == SEEK_CUR){
     new_pos += pos;
   }else if (whence == SEEK_END){
-    VOP_STAT(curproc->FDtable[fd]->file_node,fileEnd);
-    new_pos = fileEnd - 1 + pos;
+    VOP_STAT(curproc->FDtable[fd]->file_node->f_vnode,fileStat);
+    new_pos = fileStat->st_size + pos;
   }else{
     errno = EINVAL;
     return errno;
@@ -133,7 +114,9 @@ off_t lseek(int fd, off_t pos, int whence){
 }
 
 int dup2(int oldfd, int newfd){
-  if(oldfd < 0|| newfd < 0|| oldfd > OPEN_MAX - 1|| newfd > OPEN_MAX - 1){
+  int errno;
+  /*leave fd0,1,2 alone*/
+  if(oldfd < 0|| newfd < 3|| oldfd > OPEN_MAX - 1|| newfd > OPEN_MAX - 1){
     errno = EBADF;
     return errno;
   }
@@ -163,14 +146,16 @@ ssize_t read(int fd, void *buf, size_t buflen){
         return -1;
     }
 
-  	struct iovec iov;
-  	struct uio readUio;
+  	struct iovec* iov;
+  	struct uio* readUio;
+    iov = (struct iovec*)kmalloc(sizeof(struct iovec));
+    readUio = (struct uio*)kmalloc(sizeof(struct uio));
     
-    uio_kinit(&iov, &readUio, buf, buflen, curproc->FDtable[fd]->offset, UIO_READ);
+    uio_kinit(iov, readUio, buf, buflen, curproc->FDtable[fd]->offset, UIO_READ);
 
     readUio->uio_segflg = UIO_USERSPACE;
 
-    ssize_t size = VOP_READ(curproc->FDtable[fd]->file_node->f_vnode, &readUio);
+    ssize_t size = VOP_READ(curproc->FDtable[fd]->file_node->f_vnode, readUio);
 
     if(size < 0){
         errno = EIO;
@@ -183,7 +168,7 @@ ssize_t read(int fd, void *buf, size_t buflen){
 
 
 
-ssize_t write(int fd, const void *buf, size_t nbytes){
+ssize_t write(int fd, void *buf, size_t nbytes){
     int errno;
     if(fd < 3 || fd >=__OPEN_MAX || curproc ->FDtable[fd] == NULL){
         errno = EBADF;
@@ -195,14 +180,16 @@ ssize_t write(int fd, const void *buf, size_t nbytes){
         return -1;
     }
 
-    struct iovec iov;
-    struct uio writeUio;
+    struct iovec* iov;
+    struct uio* writeUio;
+    iov = (struct iovec*)kmalloc(sizeof(struct iovec));
+    writeUio = (struct uio*)kmalloc(sizeof(struct uio));
 
-    uio_kinit(&iov, &readUio, buf, nbytes, curproc->FDtable[fd]->offset, UIO_READ);
+    uio_kinit(iov, writeUio, buf, nbytes, curproc->FDtable[fd]->offset, UIO_READ);
 
     writeUio->uio_segflg = UIO_USERSPACE;
 
-    ssize_t size = VOP_WRITE(curproc->FDtable[fd]->file_node->f_vnode, &readUio);
+    ssize_t size = VOP_WRITE(curproc->FDtable[fd]->file_node->f_vnode, writeUio);
 
     if(size < 0){
         errno = EIO;
@@ -211,4 +198,15 @@ ssize_t write(int fd, const void *buf, size_t nbytes){
     else{
         return size;        
     }
+}
+
+void OFtable_bootstrap(){
+  int max_j;
+  max_j = 32;
+  OFtable = (struct OFtable_node*)kmalloc(max_j*sizeof(struct OFtable_node));
+  
+}
+
+void OFtable_clean(){
+  kfree(OFtable);
 }

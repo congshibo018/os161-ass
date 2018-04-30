@@ -25,6 +25,14 @@ struct OFtable_node{
  * Put your function declarations and data types here ...
  */
 
-int open(const char *filename, int flag, mode_t mode);
+int open(char *filename,int flags, mode_t mode);
 int close(int fd);
+
+ssize_t read(int fd, void *buf, size_t buflen);
+ssize_t write(int fd, const void *buf, size_t nbytes);
+off_t lseek(int fd, off_t pos, int whence);
+int dup2(int oldfd, int newfd);
+
+void OFtable_bootstrap();
+void OFtable_clear();
 #endif /* _FILE_H_ */
