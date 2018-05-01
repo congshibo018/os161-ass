@@ -19,7 +19,6 @@ struct OFtable_node{
   off_t offset;
   int ref_count;
 };
-
 /*
  * Put your function declarations and data types here ...
  */
