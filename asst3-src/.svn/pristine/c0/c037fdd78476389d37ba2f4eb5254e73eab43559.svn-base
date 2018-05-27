@@ -1,0 +1,65 @@
+#include <types.h>
+#include <kern/errno.h>
+#include <lib.h>
+#include <thread.h>
+#include <addrspace.h>
+#include <vm.h>
+#include <machine/tlb.h>
+
+/* Place your page table functions here */
+struct page_table_entry{
+  vaddr_t vpn; /*virtual page number*/
+  paddr_t pfn; /*physical frame number*/
+  int pid;
+  int next_entry;
+};
+
+struct page_table_entry *page_table = 0;
+static struct spinlock page_table_lock = SPINLOCK_INITIALIZER;
+
+void page_table_init(void){
+        spinlock_acquire(&page_table_lock);
+	paddr_t page_table_size = ram_getsize();
+	int entry_num = (page_table_size/PAGE_SIZE)*2;/*twice as many entries as there are frames*/
+	int page_num = entry_num*sizeof(struct page_table_entry)/PAGE_SIZE +1;
+	page_table = (struct page_table_entry *)PADDR_TO_KVADDR(ram_stealmem(page_num));
+	for(int i = 0; i < entry_num;i ++){
+	  page_table[i].vpn = 0;
+	  page_table[i].pfn = 0;
+	  page_table[i].pid = 0;
+	  page_table[i].next_entry = 0;
+	}
+	spinlock_release(&page_table_lock);
+
+}
+void vm_bootstrap(void)
+{
+        frame_table_init();
+        /* Initialise VM sub-system.  You probably want to initialise your 
+           frame table here as well.
+        */
+}
+
+int
+vm_fault(int faulttype, vaddr_t faultaddress)
+{
+        (void) faulttype;
+        (void) faultaddress;
+
+        panic("vm_fault hasn't been written yet\n");
+
+        return EFAULT;
+}
+
+/*
+ *
+ * SMP-specific functions.  Unused in our configuration.
+ */
+
+void
+vm_tlbshootdown(const struct tlbshootdown *ts)
+{
+        (void)ts;
+        panic("vm tried to do tlb shootdown?!\n");
+}
+

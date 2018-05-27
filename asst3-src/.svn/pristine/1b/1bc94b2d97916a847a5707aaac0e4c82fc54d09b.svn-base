@@ -26,21 +26,21 @@ static struct spinlock frame_lock = SPINLOCK_INITIALIZER;
  * frame table initialisation function, or check to see if the
  * frame table has been initialised and call ram_stealmem() otherwise.
  */
-void frame_table_init(void){
+void frametable_init(void){
         spinlock_acquire(&stealmem_lock);
-	paddr_t frame_table_pointer = ram_getfirstfree();/*low address*/
-	paddr_t frame_table_size = ram_getsize();/*high address*/
-	int i;
-	int frame_table_framenum = frame_table_size/PAGE_SIZE;
-	frame_table = (struct frame_table_entry*)(PADDR_TO_KVADDR(frame_table_pointer));
+	paddr_t frametable_pointer = ram_getfirstfree();/*low address*/
+	paddr_t frametable_size = ram_getsize();/*high address*/
 
-	for(i =0; i<frame_table_framenum-1;i++){
+	frametable_framenum = frametable_size/PAGE_SIZE;
+	frame_table = (struct frame_entry*)(PADDR_TO_KVADDR(frametable_pointer));
+
+	for(int i =0; i<frametable_framenum-1;i++{
 	    frame_table[i].used = false;
 	    frame_table[i].next_free = i+1;
 	}
 	frame_table[i].used = false;
 	frame_table[i].next_free = -1;
-	first_free = frame_table_pointer/PAGE_SIZE+1;
+	first_free = frametable_pointer/PAGE_SIZE+1;
 	spinlock_release(&stealmem_lock);
 	    /*maybe some action on frames for kernel acquired; eg take_one_frame()?*/
 
@@ -73,7 +73,7 @@ vaddr_t alloc_kpages(unsigned int npages)
 	spinlock_release(&frame_lock);
         if(addr == 0)
                 return 0;
-	bzero((void *)PADDR_TO_KVADDR(addr), PAGE_SIZE);
+
         return PADDR_TO_KVADDR(addr);
 }
 

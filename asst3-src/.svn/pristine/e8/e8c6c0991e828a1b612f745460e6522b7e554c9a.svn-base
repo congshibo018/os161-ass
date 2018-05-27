@@ -43,10 +43,8 @@
 #define VM_FAULT_READ        0    /* A read was attempted */
 #define VM_FAULT_WRITE       1    /* A write was attempted */
 #define VM_FAULT_READONLY    2    /* A write to a readonly page was attempted*/
-#define PAGE_BITS 12
 
-void frame_table_init(void);
-void page_table_init(void);
+void frametable_init(void);
 /* Initialization function */
 void vm_bootstrap(void);
 
@@ -59,9 +57,6 @@ void free_kpages(vaddr_t addr);
 
 /* TLB shootdown handling called from interprocessor_interrupt */
 void vm_tlbshootdown(const struct tlbshootdown *);
-
-/* change one frame to used status*/
 void take_one_frame(int i);
-int get_first_free_frame(void);
 
 #endif /* _VM_H_ */

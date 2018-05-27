@@ -16,7 +16,7 @@ struct page_table_entry{
   int pid;
   int next_entry;
 };
-extern int first_free;
+
 struct page_table_entry *page_table = 0;
 static struct spinlock page_table_lock = SPINLOCK_INITIALIZER;
 
@@ -27,17 +27,16 @@ void page_table_init(void){
 	int page_num = entry_num*sizeof(struct page_table_entry)/PAGE_SIZE +1;
 	page_table = (struct page_table_entry *)PADDR_TO_KVADDR(ram_stealmem(page_num));
 	for(int i = 0; i < entry_num;i ++){
-	        page_table[i].vpn = 0;
-		page_table[i].pfn = 0;
-		page_table[i].pid = 0;
-		page_table[i].next_entry = 0;
+	  page_table[i].vpn = 0;
+	  page_table[i].pfn = 0;
+	  page_table[i].pid = 0;
+	  page_table[i].next_entry = 0;
 	}
 	spinlock_release(&page_table_lock);
 
 }
 void vm_bootstrap(void)
 {
-        page_table_init();
         frame_table_init();
         /* Initialise VM sub-system.  You probably want to initialise your 
            frame table here as well.
@@ -57,7 +56,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         vaddr_t faultaddr = faultaddress & PAGE_FRAME;
         struct addrspace* as = proc_getas();
         uint32_t index = hpt_hash(as, faultaddr);
-        int pid = curproc->p_pid;
+        int pid = curproc->pid;
         int found = 0;
         struct page_table_entry* entry = &page_table[index];
         do{
@@ -97,7 +96,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 // TODO: handle Stack region 
 
                 // TODO: verify the process once
-	        int frame_num = get_first_free_frame();
+                int frame_num = get_first_free_frame();
                 take_one_frame(frame_num);
                 paddr_t frame = frame_num << 12;
 
@@ -150,6 +149,3 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
         panic("vm tried to do tlb shootdown?!\n");
 }
 
-int get_first_free_frame(void){
-        return first_free;
-}
