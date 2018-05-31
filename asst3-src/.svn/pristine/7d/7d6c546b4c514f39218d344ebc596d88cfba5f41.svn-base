@@ -68,9 +68,6 @@ as_create(void)
 
         as->region_list->head = NULL;
         as->region_list->tail = NULL;
-        as->stack_base = USERSTACK - (VMSTACKSIZE * PAGE_SIZE); // fixed stack size;
-        as->stack_top =  USERSTACK;
-        as->heap_base = as->heap_top =  0;
         return as;
 }
 
@@ -194,6 +191,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
          */
 
         struct as_region* new = NULL;
+ 
         if(as->region_list->head != NULL && as->region_list->tail != NULL){
                 new = as->region_list->tail;
                 new -> next = (struct as_region*) kmalloc(sizeof(struct as_region));
@@ -230,13 +228,11 @@ as_prepare_load(struct addrspace *as)
          * Write this.
          */
 
-        as ->region_list-> ignore_permissions = true;
         struct as_region *temp = as->region_list->head;
 	while(temp->next != NULL){
 	        temp -> permissions = temp -> permissions | 0x2;
 		temp = temp->next;
 	}
-
         return 0;
 }
 
@@ -246,14 +242,11 @@ as_complete_load(struct addrspace *as)
         /*
          * Write this.
          */
-
-        as ->region_list -> ignore_permissions = false;
         struct as_region *temp = as->region_list->head;
 	while(temp->next !=NULL){
 	        temp -> permissions = temp -> prepermissions;
 		temp = temp -> next;
 	}
-
         return 0;
 }
 
@@ -267,7 +260,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
         (void)as;
 
         /* Initial user-level stack pointer */
-        *stackptr = as->stack_top;
+        *stackptr = USERSTACK;
 
         return 0;
 }

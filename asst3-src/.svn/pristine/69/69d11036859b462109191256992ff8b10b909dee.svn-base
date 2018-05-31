@@ -38,14 +38,11 @@
 #include <vm.h>
 #include "opt-dumbvm.h"
 
-#define VMSTACKSIZE 16
-
 struct vnode;
 
 struct regionlist{
         struct as_region* head;
         struct as_region* tail;
-        bool ignore_permissions;
 };
 
 struct as_region{
@@ -77,10 +74,6 @@ struct addrspace {
 #else
         /* Put stuff here for your VM system */
         struct regionlist *region_list;
-        vaddr_t stack_base;
-        vaddr_t stack_top;
-        vaddr_t heap_base;
-        vaddr_t heap_top;
 #endif
 };
 

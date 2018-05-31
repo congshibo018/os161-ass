@@ -45,7 +45,6 @@ struct vnode;
 struct regionlist{
         struct as_region* head;
         struct as_region* tail;
-        bool ignore_permissions;
 };
 
 struct as_region{

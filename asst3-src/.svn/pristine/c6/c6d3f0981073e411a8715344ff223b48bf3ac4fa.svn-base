@@ -53,13 +53,12 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 {
         (void) faulttype;
         (void) faultaddress;
-        
-        vaddr_t faultaddr = faultaddress & PAGE_FRAME;
-        struct addrspace* as = proc_getas();
-        if(as->region_list->ignore_permissions == false && faulttype == VM_FAULT_READONLY){
+
+        if(faulttype == VM_FAULT_READONLY){
                 return EFAULT;
         } 
-
+        vaddr_t faultaddr = faultaddress & PAGE_FRAME;
+        struct addrspace* as = proc_getas();
         uint32_t index = hpt_hash(as, faultaddr);
         int pid = curproc->p_pid;
         int found = 0;
@@ -87,7 +86,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         found = 0;
         do{
                 vaddr_t end = regions->vbase + (regions->npages * PAGE_SIZE);
-                if(regions->vbase <= faultaddr && faultaddr < end){
+                if(regions->vbase < faultaddr && faultaddr < end){
                         found = 1;
                         break;
                 }

@@ -15,25 +15,22 @@ struct page_table_entry{
   paddr_t pfn; /*physical frame number*/
   int pid;
   int next_entry;
-  bool dirty;
 };
 extern int first_free;
 struct page_table_entry *page_table = 0;
 static struct spinlock page_table_lock = SPINLOCK_INITIALIZER;
-int hpt_size = 0;
+
 void page_table_init(void){
         spinlock_acquire(&page_table_lock);
 	paddr_t page_table_size = ram_getsize();
 	int entry_num = (page_table_size/PAGE_SIZE)*2;/*twice as many entries as there are frames*/
 	int page_num = entry_num*sizeof(struct page_table_entry)/PAGE_SIZE +1;
 	page_table = (struct page_table_entry *)PADDR_TO_KVADDR(ram_stealmem(page_num));
-	hpt_size = entry_num;
 	for(int i = 0; i < entry_num;i ++){
 	        page_table[i].vpn = 0;
 		page_table[i].pfn = 0;
 		page_table[i].pid = 0;
 		page_table[i].next_entry = 0;
-		page_table[i].dirty = 0;
 	}
 	spinlock_release(&page_table_lock);
 
@@ -42,7 +39,6 @@ void vm_bootstrap(void)
 {
         page_table_init();
         frame_table_init();
-	
         /* Initialise VM sub-system.  You probably want to initialise your 
            frame table here as well.
         */
@@ -53,13 +49,13 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 {
         (void) faulttype;
         (void) faultaddress;
-        
-        vaddr_t faultaddr = faultaddress & PAGE_FRAME;
-        struct addrspace* as = proc_getas();
-        if(as->region_list->ignore_permissions == false && faulttype == VM_FAULT_READONLY){
+
+
+        if(faulttype == VM_FAULT_READONLY){
                 return EFAULT;
         } 
-
+        vaddr_t faultaddr = faultaddress & PAGE_FRAME;
+        struct addrspace* as = proc_getas();
         uint32_t index = hpt_hash(as, faultaddr);
         int pid = curproc->p_pid;
         int found = 0;
@@ -87,51 +83,46 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         found = 0;
         do{
                 vaddr_t end = regions->vbase + (regions->npages * PAGE_SIZE);
-                if(regions->vbase <= faultaddr && faultaddr < end){
+                if(regions->vbase < faultaddr && faultaddr < end){
                         found = 1;
                         break;
                 }
                 regions = regions->next;
         }while(regions != NULL);
-  
-        if(found == 0){
-                if(faultaddr >= as->stack_base && faultaddr < as->stack_top){
-                        found = 1; // Space to make changes later for Stack if needed.
-                }   
-                // else if(faultaddr >= heap_base && faultaddr < heap_top){
-                //         found = 1;
-                // }
-                else{
-                        return EFAULT;
-                }             
 
+        if(found == 0){
+                return EFAULT;
         }
-        // TODO: verify the process once
-        int frame_num = get_first_free_frame();
-        take_one_frame(frame_num);
-        paddr_t frame = frame_num << 12;
-  
-        struct page_table_entry * new_entry = &page_table[index];
-        struct page_table_entry * prev_entry = &page_table[index];
-        do{
-                if(new_entry->pid == 0 && new_entry->vpn == 0){
-                        new_entry -> vpn = faultaddr;
-                        new_entry -> pfn = frame;
-                        new_entry -> pid = pid;
-                        prev_entry -> next_entry = index;
-                        break;
-                }
-                prev_entry = &page_table[index];
-                index = new_entry->next_entry;
-                new_entry = &page_table[index];
-        }while(new_entry != NULL);
-     
-        uint32_t entry_hi = entry->vpn | new_entry->pid;
-        uint32_t entry_lo = entry->pfn | TLBLO_VALID; // check if we need to add the dirty and write bits.
-        int s = splhigh();
-        tlb_random(entry_hi, entry_lo);
-        splx(s);
-        return 0;
+        else{
+                // TODO: handle Stack region 
+
+                // TODO: verify the process once
+	        int frame_num = get_first_free_frame();
+                take_one_frame(frame_num);
+                paddr_t frame = frame_num << 12;
+
+                struct page_table_entry * new_entry = &page_table[index];
+                struct page_table_entry * prev_entry = &page_table[index];
+                do{
+                        if(new_entry->pid == 0 && new_entry->vpn == 0){
+                                new_entry -> vpn = faultaddr;
+                                new_entry -> pfn = frame;
+                                new_entry -> pid = pid;
+                                prev_entry -> next_entry = index;
+                                break;
+                        }
+                        prev_entry = &page_table[index];
+                        index = new_entry->next_entry;
+                        new_entry = &page_table[index];
+                }while(new_entry != NULL);
+                
+                uint32_t entry_hi = entry->vpn | new_entry->pid;
+                uint32_t entry_lo = entry->pfn | TLBLO_VALID; // check if we need to add the dirty and write bits.
+                int s = splhigh();
+                tlb_random(entry_hi, entry_lo);
+                splx(s);
+        }
+        return EFAULT;
 }
 
 
@@ -142,6 +133,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr)
 {
         uint32_t index;
+        int hpt_size = (ram_getsize() / PAGE_SIZE )*2; // need to reuse the value from initialization
         index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % hpt_size;
         return index;
 }
