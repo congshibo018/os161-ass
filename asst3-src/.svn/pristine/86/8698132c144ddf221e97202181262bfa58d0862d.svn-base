@@ -103,7 +103,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                 new->pbase = i->pbase;
                 new->npages = i->npages;
                 new->permissions = i->permissions;
-		new->prepermissions = i->prepermissions;
+		new->prepermissions = i->permissions;
                 if(i->next != NULL){
                         new->next = (struct as_region*) kmalloc(sizeof(struct as_region));
                         new = new->next;
@@ -126,14 +126,7 @@ as_destroy(struct addrspace *as)
         /*
          * Clean up as needed.
          */
-        struct as_region *i,*cur;
-	i = as->region_list->head;
-	/* free region */
-	while(i != NULL){
-	        cur = i->next;
-	        kfree(i);
-		i = cur;
-	}
+
         kfree(as);
 }
 
