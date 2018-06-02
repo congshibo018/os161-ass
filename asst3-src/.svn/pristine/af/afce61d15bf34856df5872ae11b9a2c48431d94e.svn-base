@@ -78,7 +78,7 @@ int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
         struct addrspace *newas;
-        struct spinlock page_table_copy_lock = SPINLOCK_INITIALIZER;
+
         newas = as_create();
         if (newas==NULL) {
                 return ENOMEM;
@@ -102,60 +102,6 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                 new->npages = i->npages;
                 new->permissions = i->permissions;
 		new->prepermissions = i->prepermissions;
-
-                //copy the pagetable entries.
-                spinlock_acquire(&page_table_copy_lock);
-
-                int pid = curproc -> p_pid;
-                uint32_t index;
-                int found = 0;
-                vaddr_t faultaddr;
-
-                for(size_t j = 0; j< i->npages; j++){
-                        faultaddr = i->vbase + (j * PAGE_SIZE);
-                        index = hpt_hash(old, faultaddr);
-                        struct page_table_entry * new_entry = &page_table[index];
-                        do{
-                                if(new_entry->pid == pid && new_entry->vpn == faultaddr){
-                                        found = 1;
-                                        break;
-                                }
-                                if(new_entry->next_entry == 0){
-                                        break;
-                                }
-                                new_entry = &page_table[new_entry->next_entry];
-                        }while(new_entry != NULL);
-
-                        if(found == 0){
-                                continue;
-                        }
-
-                        int frame_num = get_first_free_frame();
-                        take_one_frame(frame_num);
-                        paddr_t frame = frame_num << 12;
-
-                        struct page_table_entry* prev_entry = &page_table[index];     
-                        struct page_table_entry* temp =  prev_entry;           
-                        new_entry = &page_table[index];
-
-                        do{
-                                if(new_entry->pid == 0 && new_entry->vpn == 0){
-                                        new_entry -> vpn = faultaddr;
-                                        new_entry -> pfn = frame;
-                                        new_entry -> pid = pid; // check whether this is the proper ASID or not
-                                        prev_entry -> next_entry = index;
-                                        break;
-                                }
-                                prev_entry = &page_table[index];
-                                index = new_entry->next_entry;
-                                new_entry = &page_table[index];
-                        }while(new_entry != NULL);
-
-                        memcpy((void *)new_entry->pfn, (void *)temp->pfn, PAGE_SIZE);
-                }
-                
-                spinlock_release(&page_table_copy_lock);
-
                 if(i->next != NULL){
                         new->next = (struct as_region*) kmalloc(sizeof(struct as_region));
                         new = new->next;
@@ -164,11 +110,18 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                 else{
                         break;
                 }
-
         }
+	/*
+	while(i != NULL){
+	        int readable = i->permissions & PF_R;
+		int writeable = i->permissions & PF_W;
+		int executable = i->permissions & PF_X;
+		as_define_region(newas,i->vbase,i->npages * PAGE_SIZE,readable,writeable,executable);
+		i = i->next;
+		new = new->next;
+		memmove((void *)new->vbase,(void *)i->vbase,i->npages * PAGE_SIZE);
+		}*/
 
-        newas->stack_base = old->stack_base;
-        newas->stack_top = old->stack_top;
         //TODO: allocate and copy frames.
 
         *ret = newas;

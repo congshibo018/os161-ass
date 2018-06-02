@@ -169,6 +169,17 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
         newas->stack_base = old->stack_base;
         newas->stack_top = old->stack_top;
+	/*
+	while(i != NULL){
+	        int readable = i->permissions & PF_R;
+		int writeable = i->permissions & PF_W;
+		int executable = i->permissions & PF_X;
+		as_define_region(newas,i->vbase,i->npages * PAGE_SIZE,readable,writeable,executable);
+		i = i->next;
+		new = new->next;
+		memmove((void *)new->vbase,(void *)i->vbase,i->npages * PAGE_SIZE);
+		}*/
+
         //TODO: allocate and copy frames.
 
         *ret = newas;
