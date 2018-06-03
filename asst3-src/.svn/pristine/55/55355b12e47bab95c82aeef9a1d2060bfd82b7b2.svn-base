@@ -89,8 +89,10 @@ as_copy(struct addrspace *old, struct addrspace **ret)
          */
 
         struct as_region *i, *new;
-	i = old->region_list->head;
-	new = newas->region_list->head;	
+
+        i = old->region_list->head;
+        new = newas->region_list->head;
+	
         while(i != NULL){
                 if(new == NULL){
                         new = (struct as_region*) kmalloc(sizeof(struct as_region));
@@ -127,31 +129,31 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                         if(found == 0){
                                 continue;
                         }
-			/*
-                         int frame_num = get_first_free_frame();
-                         take_one_frame(frame_num);
-                         paddr_t frame = frame_num << 12;
 
-                         struct page_table_entry* prev_entry = &page_table[index];     
-                         struct page_table_entry* temp =  prev_entry;           
-                         new_entry = &page_table[index];
+                        // int frame_num = get_first_free_frame();
+                        // take_one_frame(frame_num);
+                        // paddr_t frame = frame_num << 12;
 
-                         do{
-                                 if(new_entry->pid == 0 && new_entry->vpn == 0){
-                                         new_entry -> vpn = faultaddr;
-                                         new_entry -> pfn = frame;
-                                         new_entry -> pid = pid; // check whether this is the proper ASID or not
-                                         prev_entry -> next_entry = index;
-                                         break;
-                                 }
-                                 prev_entry = &page_table[index];
-                                 index = new_entry->next_entry;
-                                 new_entry = &page_table[index];
-                         }while(new_entry != NULL);
+                        // struct page_table_entry* prev_entry = &page_table[index];     
+                        // struct page_table_entry* temp =  prev_entry;           
+                        // new_entry = &page_table[index];
 
-                         memcpy((void *)new_entry->pfn, (void *)temp->pfn,PAGE_SIZE);*/
+                        // do{
+                        //         if(new_entry->pid == 0 && new_entry->vpn == 0){
+                        //                 new_entry -> vpn = faultaddr;
+                        //                 new_entry -> pfn = frame;
+                        //                 new_entry -> pid = pid; // check whether this is the proper ASID or not
+                        //                 prev_entry -> next_entry = index;
+                        //                 break;
+                        //         }
+                        //         prev_entry = &page_table[index];
+                        //         index = new_entry->next_entry;
+                        //         new_entry = &page_table[index];
+                        // }while(new_entry != NULL);
+
+                        // memcpy((void *)new_entry->pfn, (void *)temp->pfn, PAGE_SIZE);
                 }
-		       
+                
                 spinlock_release(&page_table_copy_lock);
 
                 flush_tlb();
@@ -166,7 +168,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                 }
 
         }
-	
+
         newas->stack_base = old->stack_base;
         newas->stack_top = old->stack_top;
         //TODO: allocate and copy frames.

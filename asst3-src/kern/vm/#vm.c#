@@ -80,14 +80,14 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         }
         struct as_region* regions = as->region_list->head;
         found = 0;
-        while(regions != NULL){
+        do{
                 vaddr_t end = regions->vbase + (regions->npages * PAGE_SIZE);
                 if(regions->vbase <= faultaddr && faultaddr < end){
                         found = 1;
                         break;
                 }
                 regions = regions->next;
-        }
+        }while(regions != NULL);
   
         if(found == 0){
                 if(faultaddr >= as->stack_base && faultaddr < as->stack_top){

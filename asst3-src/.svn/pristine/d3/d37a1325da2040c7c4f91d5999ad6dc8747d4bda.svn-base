@@ -16,12 +16,12 @@ static struct spinlock page_table_lock = SPINLOCK_INITIALIZER;
 int hpt_size = 0;
 void page_table_init(void){
         spinlock_acquire(&page_table_lock);
-	paddr_t page_table_size = ram_getsize();
-	int entry_num = (page_table_size/PAGE_SIZE)*2;/*twice as many entries as there are frames*/
-	int page_num = entry_num*sizeof(struct page_table_entry)/PAGE_SIZE +1;
+	paddr_t max_ram_address = ram_getsize();
+	page_table_size = (max_ram_address/PAGE_SIZE)*2;/*twice as many entries as there are frames*/
+	int page_num = page_table_size*sizeof(struct page_table_entry)/PAGE_SIZE +1;
 	page_table = (struct page_table_entry *)PADDR_TO_KVADDR(ram_stealmem(page_num));
-	hpt_size = entry_num;
-	for(int i = 0; i < entry_num;i ++){
+	hpt_size = page_table_size;
+	for(int i = 0; i < page_table_size;i ++){
 	        page_table[i].vpn = 0;
 		page_table[i].pfn = 0;
 		page_table[i].pid = 0;
@@ -44,7 +44,6 @@ void vm_bootstrap(void)
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-
         if(faultaddress == 0){
                 return EFAULT;
         }
@@ -79,6 +78,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 return 0; // TODO: confirm and change the value.
         }
         struct as_region* regions = as->region_list->head;
+        if(regions == 0){
+                return EFAULT;
+        }
+
         found = 0;
         while(regions != NULL){
                 vaddr_t end = regions->vbase + (regions->npages * PAGE_SIZE);
@@ -108,20 +111,31 @@ vm_fault(int faulttype, vaddr_t faultaddress)
   
         struct page_table_entry * new_entry = &page_table[index];
         struct page_table_entry * prev_entry = &page_table[index];
-        do{
+        uint32_t pti = 0;
+        for(int k = 0; k< page_table_size; k++){
+                pti = hpt_hash(as, faultaddr + k * PAGE_SIZE);
+                new_entry = &page_table[pti];
                 if(new_entry->pid == 0 && new_entry->vpn == 0){
-                        new_entry -> vpn = faultaddr;
-                        new_entry -> pfn = frame;
-                        new_entry -> pid = pid;
-                        new_entry -> next_entry = 0;
-                        if(prev_entry != new_entry)
-                                prev_entry -> next_entry = index;
                         break;
                 }
+        }
+
+        while(prev_entry !=NULL){
+                if(prev_entry->next_entry == 0){
+                        break;
+                }
+                index = prev_entry->next_entry;
                 prev_entry = &page_table[index];
-                index = new_entry->next_entry;
-                new_entry = &page_table[index];
-        }while(new_entry != NULL);
+        }
+
+        new_entry -> vpn = faultaddr;
+        new_entry -> pfn = frame;
+        new_entry -> pid = pid; // check whether this is the proper ASID or not
+        new_entry -> next_entry = 0; 
+        if(index != pti){
+                prev_entry -> next_entry = pti;
+        }       
+
      
         uint32_t entry_hi = entry->vpn | 0x000; // leaving ASID as )0x000
         uint32_t entry_lo = entry->pfn | TLBLO_DIRTY|TLBLO_VALID; // check if we need to add the dirty and write bits.
